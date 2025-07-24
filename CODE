@@ -1,0 +1,159 @@
+
+Implement Rate Limiting
+Basic Rate Limiter (Global)
+javascript
+
+const rateLimit = require('express-rate-limit');
+
+// Apply to all requests (100 requests per 15 mins per IP)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Max requests per IP
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true, // Adds `RateLimit-*` headers
+  legacyHeaders: false, // Disables deprecated `X-RateLimit-*` headers
+});
+
+app.use(globalLimiter); // Apply globally
+
+
+
+
+
+
+
+
+
+
+Secure CORS (Cross-Origin Requests)
+javascript
+
+const cors = require('cors');
+
+// Allow only trusted domains
+const corsOptions = {
+  origin: ['https://yourdomain.com', 'https://yourapp.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+
+// Block all others
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!corsOptions.origin.includes(origin)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+});
+
+
+
+
+
+
+
+
+Stricter Limiter for Auth Endpoints
+javascript
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // Only 5 login attempts per minute
+  message: 'Too many login attempts. Try again later.',
+});
+
+app.use('/api/auth', authLimiter); // Apply only to /auth routes
+
+
+
+
+
+
+
+
+API Authentication (API Keys & JWT)
+Option 1: API Key Authentication
+javascript
+
+const API_KEYS = new Map();
+API_KEYS.set('SECRET-API-KEY-123', { name: 'Mobile App', permissions: ['read'] });
+
+// Middleware to check API key
+function apiKeyAuth(req, res, next) {
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  
+  if (!apiKey || !API_KEYS.has(apiKey)) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+  
+  req.client = API_KEYS.get(apiKey);
+  next();
+}
+
+// Protect a route
+app.get('/api/protected', apiKeyAuth, (req, res) => {
+  res.json({ message: 'Access granted', client: req.client });
+});
+
+
+
+
+
+
+
+
+
+JWT (OAuth-like) Authentication
+javascript
+
+const jwt = require('jsonwebtoken');
+const SECRET_KEY = 'your-secret-key';
+
+// Login route (issues tokens)
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  // Validate user (example)
+  if (username === 'admin' && password === 'password') {
+    const token = jwt.sign({ user: username }, SECRET_KEY, { expiresIn: '1h' });
+    return res.json({ token });
+  }
+  res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// Middleware to verify JWT
+function authenticateToken(req, res, next) {
+  const token = req.headers['authorization']?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
+
+// Protected route
+app.get('/api/user-data', authenticateToken, (req, res) => {
+  res.json({ data: 'Sensitive info', user: req.user });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+Add Helmet for HTTP Security
+javascript
+
+const helmet = require('helmet');
+app.use(helmet()); // Adds security headers
